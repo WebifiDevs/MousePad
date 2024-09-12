@@ -1,11 +1,8 @@
 /virt 
 # pycache
 __pycache__/
-utils/__pycache__/
-actions/__pycache__/
+*.pyc
+/utils/__pycache__
 
 /designs
 /designs/*
-
-# pycache files
-*.pyc
