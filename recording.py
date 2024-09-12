@@ -1,8 +1,9 @@
+# recording.py
+
 import pyautogui
 import time
 import json
 import threading
-import tkinter as tk
 from pynput import mouse, keyboard
 from emergency_stop import start_emergency_listener, stop_emergency_listener, stop_replay
 
@@ -16,7 +17,7 @@ recording_area = None  # Define the area as (x1, y1, x2, y2)
 last_mouse_move_time = 0  # For throttling mouse move events
 mouse_move_interval = 0.1  # Record mouse moves every 0.1 seconds
 click_count = 0  # To track the number of clicks for visual markers
-record_mouse_moves = False  # Set to True to record mouse movements
+record_mouse_moves = True  # Set to True to record mouse movements
 
 def record_action(action_type, **kwargs):
     """Record an action with its type, timestamp, and additional data."""
@@ -34,31 +35,20 @@ def is_within_area(x, y):
     x1, y1, x2, y2 = recording_area
     return x1 <= x <= x2 and y1 <= y <= y2
 
+def set_recording_area(area):
+    """Set the recording area."""
+    global recording_area
+    recording_area = area
+
+def set_record_mouse_moves(value):
+    """Set whether to record mouse movements."""
+    global record_mouse_moves
+    record_mouse_moves = value
+
 def draw_marker(x, y, click_number):
-    """Draw a red dot at the click position and keep it visible with a number."""
-    def create_overlay():
-        overlay_window = tk.Tk()
-        overlay_window.overrideredirect(True)
-        overlay_window.attributes("-topmost", True)
-        overlay_window.attributes("-transparentcolor", "white")
-        overlay_window.geometry(f"{overlay_window.winfo_screenwidth()}x{overlay_window.winfo_screenheight()}+0+0")
-        overlay_canvas = tk.Canvas(overlay_window, bg="white", highlightthickness=0)
-        overlay_canvas.pack(fill=tk.BOTH, expand=True)
-        
-        # Draw the red marker with a number
-        marker_radius = 10
-        overlay_canvas.create_oval(x - marker_radius, y - marker_radius,
-                                   x + marker_radius, y + marker_radius,
-                                   fill="red", outline="red")
-        overlay_canvas.create_text(x, y - 20, text=str(click_number), fill="white", font=("Helvetica", 12, "bold"))
-        overlay_canvas.update()
-        
-        # Keep the overlay visible for a short time
-        time.sleep(0.5)
-        overlay_window.destroy()
-    
-    # Run the overlay in a separate thread
-    threading.Thread(target=create_overlay).start()
+    """Draw a visual marker at the click position."""
+    # For simplicity, we will not implement this function as Tkinter is not thread-safe
+    pass  # Consider using a library that supports thread-safe GUI updates
 
 def start_recording(update_gui_state=None, update_log=None):
     """Start recording mouse and keyboard actions."""
@@ -130,7 +120,7 @@ def on_click(x, y, button, pressed):
         if pressed:
             record_action("button_press", x=x, y=y, button=button_name, delay=delay)
             click_count += 1
-            draw_marker(x, y, click_count)
+            # draw_marker(x, y, click_count)  # Omit this for thread safety
         else:
             record_action("button_release", x=x, y=y, button=button_name, delay=delay)
         start_time = time.time()
@@ -148,10 +138,7 @@ def on_press(key):
     global is_recording, start_time
     if is_recording:
         delay = time.time() - start_time
-        try:
-            key_name = key.char if hasattr(key, 'char') else key.name
-        except AttributeError:
-            key_name = str(key)
+        key_name = get_key_name(key)
         record_action("key_press", key=key_name, delay=delay)
         start_time = time.time()
 
@@ -160,12 +147,16 @@ def on_release(key):
     global is_recording, start_time
     if is_recording:
         delay = time.time() - start_time
-        try:
-            key_name = key.char if hasattr(key, 'char') else key.name
-        except AttributeError:
-            key_name = str(key)
+        key_name = get_key_name(key)
         record_action("key_release", key=key_name, delay=delay)
         start_time = time.time()
+
+def get_key_name(key):
+    """Get the string representation of the key."""
+    if hasattr(key, 'char') and key.char is not None:
+        return key.char
+    else:
+        return str(key).replace('Key.', '')
 
 def replay_actions(loop_count=1, speed_factor=1.0, update_log=None):
     """Replay the recorded actions with an optional loop count and speed factor."""
@@ -182,52 +173,63 @@ def replay_actions(loop_count=1, speed_factor=1.0, update_log=None):
             return
         # Start emergency listener
         start_emergency_listener()
-        for i, action in enumerate(recorded_actions):
-            # Check for emergency stop
-            if stop_replay:
-                if update_log:
-                    update_log("Replay stopped by user.")
+        try:
+            for i, action in enumerate(recorded_actions):
+                # Check for emergency stop
+                if stop_replay:
+                    if update_log:
+                        update_log("Replay stopped by user.")
+                    else:
+                        print("Replay stopped by user.")
+                    break
+                # Calculate time to wait before executing this action
+                if i == 0:
+                    time_to_wait = 0
                 else:
-                    print("Replay stopped by user.")
-                break
-            # Calculate time to wait before executing this action
-            if i == 0:
-                time_to_wait = 0
+                    time_to_wait = (action['timestamp'] - recorded_actions[i - 1]['timestamp']) / speed_factor
+                time.sleep(time_to_wait)
+                # Execute the action based on its type
+                try:
+                    if action['type'] == "start":
+                        pyautogui.moveTo(action['x'], action['y'], duration=0.1)
+                    elif action['type'] == "move":
+                        pyautogui.moveTo(action['x'], action['y'])
+                    elif action['type'] == "button_press":
+                        pyautogui.mouseDown(x=action['x'], y=action['y'], button=action['button'])
+                    elif action['type'] == "button_release":
+                        pyautogui.mouseUp(x=action['x'], y=action['y'], button=action['button'])
+                    elif action['type'] == "scroll":
+                        pyautogui.scroll(int(action['dy']), x=action['x'], y=action['y'])
+                    elif action['type'] == "key_press":
+                        pyautogui.keyDown(action['key'])
+                    elif action['type'] == "key_release":
+                        pyautogui.keyUp(action['key'])
+                    elif action['type'] == "end":
+                        pyautogui.moveTo(action['x'], action['y'], duration=0.1)
+                    # Add other action types as needed
+                except Exception as e:
+                    if update_log:
+                        update_log(f"Error executing action {action}: {e}")
+                    else:
+                        print(f"Error executing action {action}: {e}")
+        except Exception as e:
+            if update_log:
+                update_log(f"Replay stopped due to error: {e}")
             else:
-                time_to_wait = (action['timestamp'] - recorded_actions[i - 1]['timestamp']) / speed_factor
-            time.sleep(time_to_wait)
-            # Execute the action based on its type
-            if action['type'] == "start":
-                pyautogui.moveTo(action['x'], action['y'], duration=0.1)
-            elif action['type'] == "move":
-                pyautogui.moveTo(action['x'], action['y'])
-            elif action['type'] == "button_press":
-                pyautogui.mouseDown(x=action['x'], y=action['y'], button=action['button'])
-            elif action['type'] == "button_release":
-                pyautogui.mouseUp(x=action['x'], y=action['y'], button=action['button'])
-            elif action['type'] == "scroll":
-                pyautogui.scroll(int(action['dy']), x=action['x'], y=action['y'])
-            elif action['type'] == "key_press":
-                pyautogui.keyDown(action['key'])
-            elif action['type'] == "key_release":
-                pyautogui.keyUp(action['key'])
-            elif action['type'] == "end":
-                pyautogui.moveTo(action['x'], action['y'], duration=0.1)
-            # Add other action types as needed
-        # Stop emergency listener after each loop
-        stop_emergency_listener()
-        if stop_replay:
-            break
-        if update_log:
-            update_log("Replay iteration finished.")
-        else:
-            print("Replay iteration finished.")
+                print(f"Replay stopped due to error: {e}")
+        finally:
+            # Stop emergency listener after each loop
+            stop_emergency_listener()
+            if stop_replay:
+                break
+            if update_log:
+                update_log("Replay iteration finished.")
+            else:
+                print("Replay iteration finished.")
     if update_log:
         update_log("Replay finished.")
     else:
         print("Replay finished.")
-    # Ensure emergency listener is stopped
-    stop_emergency_listener()
 
 def save_actions(filename="actions.json"):
     """Save recorded actions to a JSON file."""

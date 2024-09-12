@@ -2,9 +2,8 @@
 
 from pynput import keyboard
 
-# Global variable to track if the replay should stop
 stop_replay = False
-emergency_listener = None
+_listener = None
 
 def on_press(key):
     global stop_replay
@@ -13,15 +12,13 @@ def on_press(key):
         return False  # Stop the listener
 
 def start_emergency_listener():
-    """Start the emergency stop keyboard listener."""
-    global emergency_listener, stop_replay
-    stop_replay = False  # Reset the flag at the start
-    emergency_listener = keyboard.Listener(on_press=on_press)
-    emergency_listener.start()
+    global _listener, stop_replay
+    stop_replay = False
+    _listener = keyboard.Listener(on_press=on_press)
+    _listener.start()
 
 def stop_emergency_listener():
-    """Stop the emergency stop keyboard listener."""
-    global emergency_listener
-    if emergency_listener is not None:
-        emergency_listener.stop()
-        emergency_listener = None
+    global _listener
+    if _listener is not None:
+        _listener.stop()
+        _listener = None
