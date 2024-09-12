@@ -7,4 +7,3 @@ if __name__ == "__main__":
 
     # Start the Tkinter (CustomTkinter) event loop
     app.mainloop()
-

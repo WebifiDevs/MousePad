@@ -1,3 +1,4 @@
+# utils/shortcuts.py
 import keyboard
 from recording import start_recording, stop_recording, replay_actions, save_actions, load_actions
 

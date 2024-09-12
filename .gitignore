@@ -6,3 +6,6 @@ actions/__pycache__/
 
 /designs
 /designs/*
+
+# pycache files
+*.pyc
