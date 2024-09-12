@@ -1,0 +1,18 @@
+- .gitattributes
+- .gitignore
+- actions
+  - actions.json
+- config.json
+- gui.py
+- main.py
+- README.md
+- recording.py
+- requirements.txt
+- utils
+  - shortcuts.py
+  - __pycache__
+    - shortcuts.cpython-312.pyc
+- __pycache__
+  - gui.cpython-312.pyc
+  - recording.cpython-312.pyc
+/virt

@@ -1,0 +1,12 @@
+{
+    "keyboard_shortcuts": {
+        "start_recording": "ctrl+r",
+        "stop_recording": "ctrl+s",
+        "play_actions": "ctrl+p",
+        "save_actions": "ctrl+q",
+        "load_actions": "ctrl+l"
+    },
+    "default_loop_count": 1,
+    "save_path": "actions/"
+}
+  
