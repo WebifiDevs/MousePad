@@ -3,3 +3,6 @@
 __pycache__/
 utils/__pycache__/
 actions/__pycache__/
+
+/designs
+/designs/*

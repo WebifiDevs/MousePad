@@ -24,8 +24,8 @@ def record_action(action_type, x, y, button=None, delay=None, double_click=False
     }
     recorded_actions.append(action)
 
-def draw_marker(x, y):
-    """Draw a red dot at the click position and keep it visible for a short duration."""
+def draw_marker(x, y, click_number):
+    """Draw a red dot at the click position and keep it visible with a number."""
     def create_overlay():
         overlay_window = tk.Tk()
         overlay_window.overrideredirect(True)
@@ -35,21 +35,21 @@ def draw_marker(x, y):
         overlay_canvas = tk.Canvas(overlay_window, bg="white", highlightthickness=0)
         overlay_canvas.pack(fill=tk.BOTH, expand=True)
         
-        # Draw the red marker
+        # Draw the red marker with a number
         marker_radius = 10
         overlay_canvas.create_oval(x - marker_radius, y - marker_radius,
                                    x + marker_radius, y + marker_radius,
                                    fill="red", outline="red")
+        overlay_canvas.create_text(x, y - 20, text=str(click_number), fill="white", font=("Helvetica", 12, "bold"))
         overlay_canvas.update()
         
-        # Close the overlay after 1 second
-        overlay_window.after(1000, overlay_window.destroy)
+        # Keep the overlay visible
         overlay_window.mainloop()
     
     # Run the overlay in a separate thread
     threading.Thread(target=create_overlay).start()
 
-def start_recording():
+def start_recording(update_gui_state=None, update_log=None):
     """Start recording mouse actions."""
     global is_recording, start_time, recorded_actions, listener, click_count
     is_recording = True
@@ -60,13 +60,16 @@ def start_recording():
     # Capture the starting position of the mouse
     start_x, start_y = pyautogui.position()
     record_action("start", start_x, start_y)
-    print(f"Recording started at position: {start_x}, {start_y}")
+    if update_log:
+        update_log(f"Recording started at position: {start_x}, {start_y}")
+    if update_gui_state:
+        update_gui_state(is_recording=True)
 
     # Start listening to mouse events
     listener = MouseListener(on_click=on_click)
     listener.start()
 
-def stop_recording():
+def stop_recording(update_gui_state=None, update_log=None):
     """Stop recording mouse actions."""
     global is_recording, listener
     is_recording = False
@@ -80,7 +83,10 @@ def stop_recording():
         listener.stop()
         listener = None
 
-    print(f"Recording stopped at position: {end_x}, {end_y}. Total actions recorded: {len(recorded_actions)}")
+    if update_log:
+        update_log(f"Recording stopped at position: {end_x}, {end_y}. Total actions recorded: {len(recorded_actions)}")
+    if update_gui_state:
+        update_gui_state(is_recording=False)
 
 def on_click(x, y, button, pressed):
     """Handle mouse click events."""
@@ -95,13 +101,14 @@ def on_click(x, y, button, pressed):
             double_click = True
 
         record_action("click", x, y, button=str(button), delay=delay, double_click=double_click)
-        draw_marker(x, y)  # Display visual marker for each click
+        draw_marker(x, y, click_count)  # Display visual marker for each click with numbering
         start_time = time.time()  # Reset start time after each action
         print(f"Mouse clicked at ({x}, {y}) with button {button} - Click {click_count} - Double-click: {double_click}")
 
-def replay_actions(loop_count=1):
+def replay_actions(loop_count=1, update_log=None):
     """Replay the recorded actions with an optional loop count."""
-    print(f"Replaying {len(recorded_actions)} actions, {loop_count} times...")
+    if update_log:
+        update_log(f"Replaying {len(recorded_actions)} actions, {loop_count} times...")
     for _ in range(loop_count):
         for action in recorded_actions:
             if action["type"] == "start":
@@ -121,7 +128,8 @@ def replay_actions(loop_count=1):
                 print(f"Moving to end position: {action['x']}, {action['y']}")
                 pyautogui.moveTo(action["x"], action["y"], duration=0.3)  # Add duration for smoother movement
             time.sleep(action["delay"] if action["delay"] else 0.2)  # Adjusted delay for smoother playback
-    print("Replay finished.")
+    if update_log:
+        update_log("Replay finished.")
 
 def save_actions(filename="actions/actions.json"):
     """Save recorded actions to a JSON file."""
